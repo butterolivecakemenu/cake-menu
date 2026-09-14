@@ -114,7 +114,7 @@
 
     <div class="panel"><h3>Add cake</h3><div class="form-grid">
       <label>Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
-      <label>Category<input id="cakeCategory" placeholder="e.g. Fruit Cake"></label>
+      <label>Category<select id="cakeCategory"></select></label>
       <label>Cake code<input id="cakeCode" placeholder="e.g. FC018"></label>
       <label>Price<input id="cakePrice" placeholder="e.g. RM88"></label>
       <label>Size<input id="cakeSize" placeholder="e.g. 6 inch"></label>
@@ -150,7 +150,7 @@ async function loadData(){
   sb.from('categories').select('*').order('sort_order'),
   sb.from('cakes').select('*, categories(name)').order('sort_order'),
   sb.from('outlets').select('*').eq('active',true).order('sort_order')]);
- categories=catData||[]; cakes=(cakeData||[]).map(c=>({...c,category:c.categories?.name||'Other'})); outlets=outletData||[]; render();
+ categories=catData||[]; cakes=(cakeData||[]).map(c=>({...c,category:c.categories?.name||'Other'})); outlets=outletData||[]; const addCategorySelect=document.getElementById('cakeCategory'); if(addCategorySelect){addCategorySelect.innerHTML=categories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')} render();
 }
 function render(){
  const cats=['All',...categories.map(c=>c.name)];
@@ -174,8 +174,8 @@ function saveStyle(){document.documentElement.style.setProperty('--title-font',t
 function applySavedStyle(){const t=localStorage.getItem('cakeTitleFont'),b=localStorage.getItem('cakeBodyFont');if(t)document.documentElement.style.setProperty('--title-font',t);if(b)document.documentElement.style.setProperty('--body-font',b)}
 async function addCategory(){const name=newCategory.value.trim();if(!name)return;const {error}=await sb.from('categories').insert({name,sort_order:categories.length+1});if(error)return alert(error.message);newCategory.value='';await loadData()}
 async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
- const catName=cakeCategory.value.trim()||'Other';let cat=categories.find(x=>x.name.toLowerCase()===catName.toLowerCase());if(!cat){const {data,error}=await sb.from('categories').insert({name:catName,sort_order:categories.length+1}).select().single();if(error)return alert(error.message);cat=data}
- const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:cat.id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
+ const category_id=Number(cakeCategory.value);if(!category_id)return alert('Please select a category');
+ const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:category_id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
 function renderAdmin(){const el=document.getElementById('adminList');if(!el||!session)return;el.innerHTML=cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''} • ${c.active===false?'Hidden':'Visible'} • Order ${c.sort_order??0}</div></div><div class="actions"><button class="btn secondary" onclick="editCake(${c.id})">Edit</button><button class="btn ${c.active===false?'success':'warn'}" onclick="toggleCake(${c.id},${c.active===false?'true':'false'})">${c.active===false?'Show':'Hide'}</button><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div></div>`).join('')}
 
 function fillEditCategories(selectedId){editCategory.innerHTML=categories.map(c=>`<option value="${c.id}" ${String(c.id)===String(selectedId)?'selected':''}>${esc(c.name)}</option>`).join('')}
