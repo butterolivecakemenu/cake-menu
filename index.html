@@ -91,6 +91,9 @@
 <section id="admin" class="admin">
   <div class="admin-head"><strong>Catalogue Manager</strong><button class="admin-btn" onclick="closeAdmin()">Back to Website</button></div>
   <div class="admin-wrap">
+    <div id="loginPanel" class="panel"><h3>Admin Login</h3><div class="form-grid"><label>Email<input id="adminEmail" type="email" placeholder="Admin email"></label><label>Password<input id="adminPassword" type="password" placeholder="Password"></label></div><br><button class="btn" onclick="adminLogin()">Login</button></div>
+    <div id="managerPanels" style="display:none">
+    <div class="panel" style="display:flex;justify-content:space-between;align-items:center"><strong>Signed in as Admin</strong><button class="btn secondary" onclick="adminLogout()">Log out</button></div>
     <div class="panel"><h3>Brand style</h3><div class="form-grid">
       <label>Title font<select id="titleFont"><option value="'Playfair Display',serif">Playfair Display</option><option value="Georgia,serif">Georgia</option><option value="Arial,sans-serif">Arial</option></select></label>
       <label>Body font<select id="bodyFont"><option value="'DM Sans',sans-serif">DM Sans</option><option value="Arial,sans-serif">Arial</option><option value="Verdana,sans-serif">Verdana</option></select></label>
@@ -102,6 +105,8 @@
       <label>Moulmein Rise<input id="wa3" placeholder="6012xxxxxxx"></label>
     </div><br><button class="btn" onclick="saveOutlets()">Save WhatsApp numbers</button></div>
 
+    <div class="panel"><h3>Categories</h3><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button></div>
+
     <div class="panel"><h3>Add cake</h3><div class="form-grid">
       <label>Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
       <label>Category<input id="cakeCategory" placeholder="e.g. Fruit Cake"></label>
@@ -112,50 +117,52 @@
     </div><br><label>Description<textarea id="cakeDesc" placeholder="Short description"></textarea></label><br><button class="btn" onclick="addCake()">Add to catalogue</button></div>
 
     <div class="panel"><h3>Current cakes</h3><div id="adminList" class="admin-list"></div></div>
+    </div>
   </div>
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const defaultData={
-  categories:['All','Signature Cake','Fruit Cake','3D Cake'],
-  outlets:[
-    {name:'Perak Road',number:''},{name:'Bayan Lepas',number:''},{name:'Moulmein Rise',number:''}
-  ],
-  cakes:[
-    {id:1,name:'Signature Chocolate',category:'Signature Cake',code:'SG001',price:'RM88',size:'6 inch',desc:'Rich chocolate cake with a smooth, elegant finish.',image:''},
-    {id:2,name:'Mango Fruit Cake',category:'Fruit Cake',code:'FR001',price:'RM98',size:'6 inch',desc:'Light cream cake topped with fresh mango.',image:''},
-    {id:3,name:'Strawberry Garden',category:'Fruit Cake',code:'FR002',price:'RM108',size:'6 inch',desc:'Fresh strawberry cake with soft sponge and cream.',image:''},
-    {id:4,name:'3D Bear Cake',category:'3D Cake',code:'3D001',price:'From RM168',size:'Custom',desc:'Cute 3D character cake, suitable for birthdays and celebrations.',image:''},
-    {id:5,name:'Classic Tiramisu',category:'Signature Cake',code:'SG002',price:'RM98',size:'6 inch',desc:'Coffee, cocoa and mascarpone-inspired signature cake.',image:''},
-    {id:6,name:'3D Racing Cake',category:'3D Cake',code:'3D002',price:'From RM188',size:'Custom',desc:'Custom 3D themed cake. Design details can be discussed via WhatsApp.',image:''}
-  ]
-};
-let data=JSON.parse(localStorage.getItem('cakeCatalogueData')||'null')||defaultData;
-let activeCategory='All';
-function save(){localStorage.setItem('cakeCatalogueData',JSON.stringify(data));render();}
-function render(){
-  const cats=['All',...new Set(data.cakes.map(c=>c.category).filter(Boolean))];
-  document.getElementById('categories').innerHTML=cats.map(c=>`<button class="cat ${c===activeCategory?'active':''}" onclick="setCat('${esc(c)}')">${c}</button>`).join('');
-  const cakes=activeCategory==='All'?data.cakes:data.cakes.filter(c=>c.category===activeCategory);
-  document.getElementById('cakeGrid').innerHTML=cakes.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image?`<img src="${c.image}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name)}</h3><div class="cake-meta"><span>${esc(c.code)}</span><strong>${esc(c.price)}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('');
-  renderAdmin();
+const SUPABASE_URL='https://xgwhzmlqrhpxefpwzjjw.supabase.co';
+const SUPABASE_KEY='sb_publishable_w-KdyIev9yDLhVunzCpfRg_e-r0qO10';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let cakes=[],categories=[],outlets=[],activeCategory='All',session=null;
+function esc(s=''){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+async function loadData(){
+ const [{data:catData},{data:cakeData},{data:outletData}]=await Promise.all([
+  sb.from('categories').select('*').order('sort_order'),
+  sb.from('cakes').select('*, categories(name)').eq('active',true).order('sort_order'),
+  sb.from('outlets').select('*').eq('active',true).order('sort_order')]);
+ categories=catData||[]; cakes=(cakeData||[]).map(c=>({...c,category:c.categories?.name||'Other'})); outlets=outletData||[]; render();
 }
-function esc(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
-function setCat(c){activeCategory=c;render()}
-function showCake(id){const c=data.cakes.find(x=>x.id===id);if(!c)return;document.getElementById('cakeDetail').innerHTML=`<div class="detail"><div class="photo">${c.image?`<img src="${c.image}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div><span class="tag">${esc(c.category)}</span><h2>${esc(c.name)}</h2><div class="muted">Cake Code: ${esc(c.code)} • ${esc(c.size)}</div><div class="price">${esc(c.price)}</div><p class="muted">${esc(c.desc)}</p><div class="outlets">${data.outlets.map(o=>`<a class="wa" href="${waLink(o,c)}" target="_blank"><span>WhatsApp ${esc(o.name)}</span><span>›</span></a>`).join('')}</div></div></div>`;document.getElementById('cakeModal').classList.add('show')}
-function waLink(o,c){const msg=`Hi, I would like to enquire about ${c.name}. Cake Code: ${c.code}. Size: ${c.size}.`;return o.number?`https://wa.me/${o.number.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`:'#'}
-function closeModal(){document.getElementById('cakeModal').classList.remove('show')}
-function modalBackdrop(e){if(e.target.id==='cakeModal')closeModal()}
-function openAdmin(){document.getElementById('admin').classList.add('show');loadSettings()}
+function render(){
+ const cats=['All',...categories.map(c=>c.name)];
+ document.getElementById('categories').innerHTML=cats.map(c=>`<button class="cat ${c===activeCategory?'active':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+ document.querySelectorAll('.cat').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;render()});
+ const shown=activeCategory==='All'?cakes:cakes.filter(c=>c.category===activeCategory);
+ document.getElementById('cakeGrid').innerHTML=shown.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image_url?`<img src="${esc(c.image_url)}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name)}</h3><div class="cake-meta"><span>${esc(c.cake_code||'')}</span><strong>${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('') || '<p class="muted">No cakes in this category yet.</p>';
+ renderAdmin();
+}
+function showCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;document.getElementById('cakeDetail').innerHTML=`<div class="detail"><div class="photo">${c.image_url?`<img src="${esc(c.image_url)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div><span class="tag">${esc(c.category)}</span><h2>${esc(c.name)}</h2><div class="muted">Cake Code: ${esc(c.cake_code||'')} • ${esc(c.size||'')}</div><div class="price">${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</div><p class="muted">${esc(c.description||'')}</p><div class="outlets">${outlets.map(o=>`<a class="wa" href="${waLink(o,c)}" target="_blank"><span>WhatsApp ${esc(o.name)}</span><span>›</span></a>`).join('')}</div></div></div>`;cakeModal.classList.add('show')}
+function waLink(o,c){const msg=`Hi, I would like to enquire about ${c.name}. Cake Code: ${c.cake_code||''}. Size: ${c.size||''}.`;return o.whatsapp?`https://wa.me/${o.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`:'#'}
+function closeModal(){cakeModal.classList.remove('show')} function modalBackdrop(e){if(e.target.id==='cakeModal')closeModal()}
+async function openAdmin(){document.getElementById('admin').classList.add('show');const {data}=await sb.auth.getSession();session=data.session;updateAdminUI()}
 function closeAdmin(){document.getElementById('admin').classList.remove('show')}
-function loadSettings(){document.getElementById('wa1').value=data.outlets[0]?.number||'';document.getElementById('wa2').value=data.outlets[1]?.number||'';document.getElementById('wa3').value=data.outlets[2]?.number||'';}
-function saveOutlets(){data.outlets=[{name:'Perak Road',number:wa1.value.trim()},{name:'Bayan Lepas',number:wa2.value.trim()},{name:'Moulmein Rise',number:wa3.value.trim()}];save();alert('WhatsApp numbers saved')}
-function saveStyle(){document.documentElement.style.setProperty('--title-font',titleFont.value);document.documentElement.style.setProperty('--body-font',bodyFont.value);localStorage.setItem('cakeTitleFont',titleFont.value);localStorage.setItem('cakeBodyFont',bodyFont.value);alert('Font settings saved')}
+function updateAdminUI(){document.getElementById('loginPanel').style.display=session?'none':'block';document.getElementById('managerPanels').style.display=session?'block':'none';if(session){loadSettings();renderAdmin()}}
+async function adminLogin(){const email=adminEmail.value.trim(),password=adminPassword.value;const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)return alert(error.message);session=data.session;adminPassword.value='';updateAdminUI()}
+async function adminLogout(){await sb.auth.signOut();session=null;updateAdminUI()}
+function loadSettings(){outlets.forEach((o,i)=>{const e=document.getElementById('wa'+(i+1));if(e)e.value=o.whatsapp||''})}
+async function saveOutlets(){for(let i=0;i<Math.min(3,outlets.length);i++){const v=document.getElementById('wa'+(i+1)).value.trim();await sb.from('outlets').update({whatsapp:v}).eq('id',outlets[i].id)}await loadData();alert('WhatsApp numbers saved')}
+function saveStyle(){document.documentElement.style.setProperty('--title-font',titleFont.value);document.documentElement.style.setProperty('--body-font',bodyFont.value);localStorage.setItem('cakeTitleFont',titleFont.value);localStorage.setItem('cakeBodyFont',bodyFont.value);alert('Font settings saved on this browser')}
 function applySavedStyle(){const t=localStorage.getItem('cakeTitleFont'),b=localStorage.getItem('cakeBodyFont');if(t)document.documentElement.style.setProperty('--title-font',t);if(b)document.documentElement.style.setProperty('--body-font',b)}
-function addCake(){const f=document.getElementById('cakePhoto').files[0];const done=(img='')=>{const c={id:Date.now(),name:cakeName.value.trim(),category:cakeCategory.value.trim()||'Other',code:cakeCode.value.trim(),price:cakePrice.value.trim(),size:cakeSize.value.trim(),desc:cakeDesc.value.trim(),image:img};if(!c.name)return alert('Please enter cake name');data.cakes.unshift(c);save();['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');alert('Cake added')};if(f){const r=new FileReader();r.onload=e=>done(e.target.result);r.readAsDataURL(f)}else done()}
-function renderAdmin(){const el=document.getElementById('adminList');if(!el)return;el.innerHTML=data.cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image?`<img src="${c.image}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.code)} • ${esc(c.price)}</div></div><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div>`).join('')}
-function deleteCake(id){if(confirm('Delete this cake?')){data.cakes=data.cakes.filter(c=>c.id!==id);save()}}
-applySavedStyle();render();
+async function addCategory(){const name=newCategory.value.trim();if(!name)return;const {error}=await sb.from('categories').insert({name,sort_order:categories.length+1});if(error)return alert(error.message);newCategory.value='';await loadData()}
+async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
+ const catName=cakeCategory.value.trim()||'Other';let cat=categories.find(x=>x.name.toLowerCase()===catName.toLowerCase());if(!cat){const {data,error}=await sb.from('categories').insert({name:catName,sort_order:categories.length+1}).select().single();if(error)return alert(error.message);cat=data}
+ const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:cat.id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:0,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
+function renderAdmin(){const el=document.getElementById('adminList');if(!el||!session)return;el.innerHTML=cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</div></div><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div>`).join('')}
+async function deleteCake(id){if(!confirm('Delete this cake?'))return;const {error}=await sb.from('cakes').delete().eq('id',id);if(error)return alert(error.message);await loadData()}
+applySavedStyle();loadData();
 </script>
+
 </body>
 </html>
