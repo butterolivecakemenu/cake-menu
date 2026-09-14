@@ -64,6 +64,11 @@
     textarea{min-height:90px;resize:vertical}
     .btn{border:0;background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;font-weight:700;cursor:pointer}
     .btn.secondary{background:#eee4d9;color:var(--ink)}
+    .btn.warn{background:#8a4b3a}
+    .btn.success{background:#2f6f4e}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .edit-panel{display:none;border:2px solid #d8c4aa}
+    .edit-panel.show{display:block}
     .admin-list{display:grid;gap:10px;margin-top:14px}
     .admin-item{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px}
     .admin-thumb{width:70px;height:55px;border-radius:10px;background:#ead8c2;overflow:hidden}.admin-thumb img{width:100%;height:100%;object-fit:cover}
@@ -116,6 +121,18 @@
       <label>Photo<input id="cakePhoto" type="file" accept="image/*"></label>
     </div><br><label>Description<textarea id="cakeDesc" placeholder="Short description"></textarea></label><br><button class="btn" onclick="addCake()">Add to catalogue</button></div>
 
+    <div id="editPanel" class="panel edit-panel"><h3>Edit cake</h3><input id="editCakeId" type="hidden"><div class="form-grid">
+      <label>Cake name<input id="editName"></label>
+      <label>Category<select id="editCategory"></select></label>
+      <label>Cake code<input id="editCode"></label>
+      <label>Price<input id="editPrice" placeholder="e.g. 88"></label>
+      <label>Size<input id="editSize"></label>
+      <label>Display order<input id="editSort" type="number" step="1" min="0"></label>
+      <label>Replace photo<input id="editPhoto" type="file" accept="image/*"></label>
+      <label>Status<select id="editActive"><option value="true">Visible</option><option value="false">Hidden</option></select></label>
+    </div><br><label>Description<textarea id="editDesc"></textarea></label><br>
+    <div class="actions"><button class="btn" onclick="saveCakeEdit()">Save changes</button><button class="btn secondary" onclick="cancelCakeEdit()">Cancel</button></div></div>
+
     <div class="panel"><h3>Current cakes</h3><div id="adminList" class="admin-list"></div></div>
     </div>
   </div>
@@ -131,7 +148,7 @@ function esc(s=''){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':
 async function loadData(){
  const [{data:catData},{data:cakeData},{data:outletData}]=await Promise.all([
   sb.from('categories').select('*').order('sort_order'),
-  sb.from('cakes').select('*, categories(name)').eq('active',true).order('sort_order'),
+  sb.from('cakes').select('*, categories(name)').order('sort_order'),
   sb.from('outlets').select('*').eq('active',true).order('sort_order')]);
  categories=catData||[]; cakes=(cakeData||[]).map(c=>({...c,category:c.categories?.name||'Other'})); outlets=outletData||[]; render();
 }
@@ -139,7 +156,7 @@ function render(){
  const cats=['All',...categories.map(c=>c.name)];
  document.getElementById('categories').innerHTML=cats.map(c=>`<button class="cat ${c===activeCategory?'active':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
  document.querySelectorAll('.cat').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;render()});
- const shown=activeCategory==='All'?cakes:cakes.filter(c=>c.category===activeCategory);
+ const visible=cakes.filter(c=>c.active!==false); const shown=activeCategory==='All'?visible:visible.filter(c=>c.category===activeCategory);
  document.getElementById('cakeGrid').innerHTML=shown.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image_url?`<img src="${esc(c.image_url)}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name)}</h3><div class="cake-meta"><span>${esc(c.cake_code||'')}</span><strong>${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('') || '<p class="muted">No cakes in this category yet.</p>';
  renderAdmin();
 }
@@ -158,8 +175,16 @@ function applySavedStyle(){const t=localStorage.getItem('cakeTitleFont'),b=local
 async function addCategory(){const name=newCategory.value.trim();if(!name)return;const {error}=await sb.from('categories').insert({name,sort_order:categories.length+1});if(error)return alert(error.message);newCategory.value='';await loadData()}
 async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
  const catName=cakeCategory.value.trim()||'Other';let cat=categories.find(x=>x.name.toLowerCase()===catName.toLowerCase());if(!cat){const {data,error}=await sb.from('categories').insert({name:catName,sort_order:categories.length+1}).select().single();if(error)return alert(error.message);cat=data}
- const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:cat.id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:0,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
-function renderAdmin(){const el=document.getElementById('adminList');if(!el||!session)return;el.innerHTML=cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</div></div><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div>`).join('')}
+ const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:cat.id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
+function renderAdmin(){const el=document.getElementById('adminList');if(!el||!session)return;el.innerHTML=cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''} • ${c.active===false?'Hidden':'Visible'} • Order ${c.sort_order??0}</div></div><div class="actions"><button class="btn secondary" onclick="editCake(${c.id})">Edit</button><button class="btn ${c.active===false?'success':'warn'}" onclick="toggleCake(${c.id},${c.active===false?'true':'false'})">${c.active===false?'Show':'Hide'}</button><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div></div>`).join('')}
+
+function fillEditCategories(selectedId){editCategory.innerHTML=categories.map(c=>`<option value="${c.id}" ${String(c.id)===String(selectedId)?'selected':''}>${esc(c.name)}</option>`).join('')}
+function editCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;editCakeId.value=c.id;editName.value=c.name||'';fillEditCategories(c.category_id);editCode.value=c.cake_code||'';editPrice.value=c.price??'';editSize.value=c.size||'';editSort.value=c.sort_order??0;editActive.value=String(c.active!==false);editDesc.value=c.description||'';editPhoto.value='';editPanel.classList.add('show');editPanel.scrollIntoView({behavior:'smooth',block:'start'})}
+function cancelCakeEdit(){editPanel.classList.remove('show');editCakeId.value=''}
+async function saveCakeEdit(){const id=Number(editCakeId.value);if(!id)return;const c=cakes.find(x=>x.id===id);if(!c)return;const name=editName.value.trim();if(!name)return alert('Please enter cake name');let image_url=c.image_url||null;const f=editPhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
+ const raw=String(editPrice.value).replace(/[^0-9.]/g,'');const payload={name,category_id:Number(editCategory.value),cake_code:editCode.value.trim(),price:raw?Number(raw):null,size:editSize.value.trim(),description:editDesc.value.trim(),image_url,sort_order:Number(editSort.value||0),active:editActive.value==='true'};const {error}=await sb.from('cakes').update(payload).eq('id',id);if(error)return alert(error.message);cancelCakeEdit();await loadData();alert('Cake updated')}
+async function toggleCake(id,newState){const {error}=await sb.from('cakes').update({active:newState}).eq('id',id);if(error)return alert(error.message);await loadData()}
+
 async function deleteCake(id){if(!confirm('Delete this cake?'))return;const {error}=await sb.from('cakes').delete().eq('id',id);if(error)return alert(error.message);await loadData()}
 applySavedStyle();loadData();
 </script>
