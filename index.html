@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Butter Olive Cake Catalogue V8 -->
+<!-- Butter Olive Cake Catalogue V10 -->
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
@@ -79,6 +79,9 @@
     .admin-list{display:grid;gap:10px;margin-top:14px}
     .admin-item{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px}
     .admin-thumb{width:70px;height:55px;border-radius:10px;background:#ead8c2;overflow:hidden}.admin-thumb img{width:100%;height:100%;object-fit:cover}
+    .category-admin-list{display:grid;gap:10px;margin-top:14px}
+    .category-admin-item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .category-admin-item strong{font-size:15px}
     .muted{color:var(--muted)}
     footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px}
     @media(max-width:800px){.hero{grid-template-columns:1fr}.hero-card{height:260px}.grid{grid-template-columns:repeat(2,1fr)}.detail{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
@@ -126,7 +129,7 @@
       <label>Moulmein Rise<input id="wa3" placeholder="6012xxxxxxx"></label>
     </div><br><button class="btn" onclick="saveOutlets()">Save WhatsApp numbers</button></div>
 
-    <div class="panel"><h3>Categories</h3><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button></div>
+    <div class="panel"><h3>Categories</h3><p class="muted">Add, rename or delete catalogue categories. Duplicate category names are blocked.</p><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button><div id="categoryAdminList" class="category-admin-list"></div></div>
 
     <div class="panel"><h3>Add cake</h3><div class="form-grid">
       <label>Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
@@ -229,17 +232,54 @@ async function resetHeroBanner(){
  updateHero();
  alert('Homepage banner reset');
 }
-async function addCategory(){const name=newCategory.value.trim();if(!name)return;const {error}=await sb.from('categories').insert({name,sort_order:categories.length+1});if(error)return alert(error.message);newCategory.value='';await loadData()}
+function normCategoryName(v){return String(v||'').trim().replace(/\s+/g,' ').toLowerCase()}
+async function addCategory(){
+ const name=newCategory.value.trim().replace(/\s+/g,' ');if(!name)return alert('Please enter a category name');
+ if(categories.some(c=>normCategoryName(c.name)===normCategoryName(name)))return alert('This category already exists');
+ const {error}=await sb.from('categories').insert({name,sort_order:categories.length+1});if(error)return alert(error.message);newCategory.value='';await loadData();alert('Category added')
+}
+function renderCategoryAdmin(){
+ const el=document.getElementById('categoryAdminList');if(!el||!session)return;
+ el.innerHTML=categories.map(c=>{const count=cakes.filter(x=>Number(x.category_id)===Number(c.id)).length;return `<div class=\"category-admin-item\"><div><strong>${esc(c.name)}</strong><div class=\"muted\">${count} cake${count===1?'':'s'}</div></div><div class=\"actions\"><button class=\"btn secondary\" onclick=\"renameCategory(${c.id})\">Rename</button><button class=\"btn secondary\" onclick=\"deleteCategory(${c.id})\">Delete</button></div></div>`}).join('')
+}
+async function renameCategory(id){
+ const c=categories.find(x=>Number(x.id)===Number(id));if(!c)return;
+ const next=prompt('Rename category',c.name);if(next===null)return;const name=next.trim().replace(/\s+/g,' ');if(!name)return alert('Category name cannot be empty');
+ if(categories.some(x=>Number(x.id)!==Number(id)&&normCategoryName(x.name)===normCategoryName(name)))return alert('Another category already has this name');
+ const {error}=await sb.from('categories').update({name}).eq('id',id);if(error)return alert(error.message);activeCategory='All';await loadData();alert('Category renamed')
+}
+async function deleteCategory(id){
+ const c=categories.find(x=>Number(x.id)===Number(id));if(!c)return;const used=cakes.filter(x=>Number(x.category_id)===Number(id));
+ if(used.length){const sample=used.slice(0,3).map(x=>x.name).join(', ');return alert(`Cannot delete ${c.name} because ${used.length} cake${used.length===1?' is':'s are'} using it${sample?': '+sample:''}. Move those cakes to another category first.`)}
+ if(!confirm(`Delete category \"${c.name}\"?`))return;const {error}=await sb.from('categories').delete().eq('id',id);if(error)return alert(error.message);if(activeCategory===c.name)activeCategory='All';await loadData();alert('Category deleted')
+}
 async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
  const category_id=Number(cakeCategory.value);if(!category_id)return alert('Please select a category');
  const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:category_id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
-function renderAdmin(){const el=document.getElementById('adminList');if(!el||!session)return;el.innerHTML=cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''} • ${c.active===false?'Hidden':'Visible'} • Order ${c.sort_order??0}</div></div><div class="actions"><button class="btn secondary" onclick="editCake(${c.id})">Edit</button><button class="btn ${c.active===false?'success':'warn'}" onclick="toggleCake(${c.id},${c.active===false?'true':'false'})">${c.active===false?'Show':'Hide'}</button><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div></div>`).join('')}
+function renderAdmin(){
+ const el=document.getElementById('adminList');if(!el||!session)return;
+ const ordered=[...cakes].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
+ el.innerHTML=ordered.map((c,i)=>`<div class="admin-item"><div class="admin-thumb">${c.image_url?`<img src="${esc(c.image_url)}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.cake_code||'')} • ${c.price!=null?'RM'+Number(c.price).toFixed(2):''} • ${c.active===false?'Hidden':'Visible'} • Position ${i+1}</div></div><div class="actions"><button class="btn secondary" onclick="moveCake(${c.id},-1)" ${i===0?'disabled':''}>↑ Up</button><button class="btn secondary" onclick="moveCake(${c.id},1)" ${i===ordered.length-1?'disabled':''}>↓ Down</button><button class="btn secondary" onclick="editCake(${c.id})">Edit</button><button class="btn ${c.active===false?'success':'warn'}" onclick="toggleCake(${c.id},${c.active===false?'true':'false'})">${c.active===false?'Show':'Hide'}</button><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div></div>`).join('');
+ renderCategoryAdmin();
+}
 
 function fillEditCategories(selectedId){editCategory.innerHTML=categories.map(c=>`<option value="${c.id}" ${String(c.id)===String(selectedId)?'selected':''}>${esc(c.name)}</option>`).join('')}
 function editCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;editCakeId.value=c.id;editName.value=c.name||'';fillEditCategories(c.category_id);editCode.value=c.cake_code||'';editPrice.value=c.price??'';editSize.value=c.size||'';editSort.value=c.sort_order??0;editActive.value=String(c.active!==false);editDesc.value=c.description||'';editPhoto.value='';editPanel.classList.add('show');editPanel.scrollIntoView({behavior:'smooth',block:'start'})}
 function cancelCakeEdit(){editPanel.classList.remove('show');editCakeId.value=''}
 async function saveCakeEdit(){const id=Number(editCakeId.value);if(!id)return;const c=cakes.find(x=>x.id===id);if(!c)return;const name=editName.value.trim();if(!name)return alert('Please enter cake name');let image_url=c.image_url||null;const f=editPhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
  const raw=String(editPrice.value).replace(/[^0-9.]/g,'');const payload={name,category_id:Number(editCategory.value),cake_code:editCode.value.trim(),price:raw?Number(raw):null,size:editSize.value.trim(),description:editDesc.value.trim(),image_url,sort_order:Number(editSort.value||0),active:editActive.value==='true'};const {error}=await sb.from('cakes').update(payload).eq('id',id);if(error)return alert(error.message);cancelCakeEdit();await loadData();alert('Cake updated')}
+async function moveCake(id,direction){
+ if(!session)return alert('Please login first');
+ const ordered=[...cakes].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
+ const from=ordered.findIndex(c=>c.id===id);if(from<0)return;
+ const to=from+direction;if(to<0||to>=ordered.length)return;
+ const [item]=ordered.splice(from,1);ordered.splice(to,0,item);
+ const updates=ordered.map((c,i)=>sb.from('cakes').update({sort_order:i+1}).eq('id',c.id));
+ const results=await Promise.all(updates);
+ const failed=results.find(r=>r.error);if(failed)return alert(failed.error.message);
+ await loadData();
+}
+
 async function toggleCake(id,newState){const {error}=await sb.from('cakes').update({active:newState}).eq('id',id);if(error)return alert(error.message);await loadData()}
 
 async function deleteCake(id){if(!confirm('Delete this cake?'))return;const {error}=await sb.from('cakes').delete().eq('id',id);if(error)return alert(error.message);await loadData()}
