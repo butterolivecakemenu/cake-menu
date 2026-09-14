@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Butter Olive Cake Catalogue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f8f5ef;--card:#fff;--ink:#2d241e;--muted:#7d7066;--accent:#8a623f;--accent2:#c8a97e;--line:#e8dfd4;
+      --title-font:'Playfair Display',serif;--body-font:'DM Sans',sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body-font)}
+    a{text-decoration:none;color:inherit}
+    .wrap{max-width:1180px;margin:auto;padding:0 20px}
+    header{position:sticky;top:0;z-index:20;background:rgba(248,245,239,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+    .topbar{height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{font-family:var(--title-font);font-size:24px;font-weight:700}
+    .brand small{display:block;font-family:var(--body-font);font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:600;margin-top:2px}
+    .admin-btn{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:999px;cursor:pointer;font-weight:600}
+    .hero{padding:50px 0 26px;display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center}
+    .hero h1{font-family:var(--title-font);font-size:clamp(42px,7vw,78px);line-height:.98;margin:0 0 18px}
+    .hero p{font-size:18px;color:var(--muted);max-width:620px;line-height:1.7;margin:0 0 24px}
+    .hero-card{height:420px;border-radius:28px;overflow:hidden;background:linear-gradient(135deg,#eadac6,#cda77e);display:flex;align-items:center;justify-content:center;position:relative}
+    .hero-card:before{content:'CAKE';font-family:var(--title-font);font-size:100px;color:rgba(255,255,255,.4);letter-spacing:10px}
+    .hero-card span{position:absolute;bottom:24px;left:24px;background:white;padding:10px 14px;border-radius:999px;font-weight:700}
+    .section-title{font-family:var(--title-font);font-size:34px;margin:22px 0 14px}
+    .cats{display:flex;gap:10px;overflow:auto;padding:4px 0 18px;scrollbar-width:none}
+    .cat{white-space:nowrap;border:1px solid var(--line);background:#fff;padding:11px 16px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted)}
+    .cat.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding-bottom:60px}
+    .cake{background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;cursor:pointer;transition:.2s ease;box-shadow:0 8px 24px rgba(65,48,35,.04)}
+    .cake:hover{transform:translateY(-3px)}
+    .cake-img{aspect-ratio:4/3;background:#eee;overflow:hidden}
+    .cake-img img{width:100%;height:100%;object-fit:cover;display:block}
+    .placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#efe3d2,#d7b891);font-family:var(--title-font);font-size:36px;color:white}
+    .cake-body{padding:16px}
+    .cake-name{font-family:var(--title-font);font-size:22px;margin:0 0 7px}
+    .cake-meta{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:14px}
+    .tag{display:inline-block;margin-top:12px;background:#f4eee7;color:var(--accent);padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}
+    .modal{position:fixed;inset:0;background:rgba(25,18,13,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+    .modal.show{display:flex}
+    .modal-card{width:min(760px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:26px;padding:22px;position:relative}
+    .close{position:absolute;right:16px;top:14px;border:0;background:#f4eee7;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:20px}
+    .detail{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .detail .photo{aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:#eee}
+    .detail .photo img{width:100%;height:100%;object-fit:cover}
+    .detail h2{font-family:var(--title-font);font-size:34px;margin:6px 0 10px}
+    .price{font-size:24px;font-weight:700;margin:12px 0}
+    .outlets{display:grid;gap:10px;margin-top:18px}
+    .wa{display:flex;justify-content:space-between;align-items:center;background:#1fa855;color:#fff;padding:14px 16px;border-radius:14px;font-weight:700}
+    .admin{position:fixed;inset:0;background:#f8f5ef;display:none;z-index:80;overflow:auto}
+    .admin.show{display:block}
+    .admin-head{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;z-index:2}
+    .admin-wrap{max-width:1000px;margin:auto;padding:24px 20px 70px}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:18px}
+    .panel h3{margin:0 0 14px;font-family:var(--title-font);font-size:26px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    label{display:grid;gap:6px;font-size:13px;font-weight:700;color:var(--muted)}
+    input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;background:#fff;color:var(--ink)}
+    textarea{min-height:90px;resize:vertical}
+    .btn{border:0;background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#eee4d9;color:var(--ink)}
+    .admin-list{display:grid;gap:10px;margin-top:14px}
+    .admin-item{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px}
+    .admin-thumb{width:70px;height:55px;border-radius:10px;background:#ead8c2;overflow:hidden}.admin-thumb img{width:100%;height:100%;object-fit:cover}
+    .muted{color:var(--muted)}
+    footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px}
+    @media(max-width:800px){.hero{grid-template-columns:1fr}.hero-card{height:260px}.grid{grid-template-columns:repeat(2,1fr)}.detail{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+    @media(max-width:520px){.grid{grid-template-columns:1fr}.topbar{height:64px}.brand{font-size:20px}.hero{padding-top:30px}.hero p{font-size:16px}.hero-card{height:220px}.section-title{font-size:28px}}
+  </style>
+</head>
+<body>
+<header><div class="wrap topbar"><div class="brand">Butter Olive<small>CAKE CATALOGUE</small></div><button class="admin-btn" onclick="openAdmin()">Manage Catalogue</button></div></header>
+<main class="wrap">
+  <section class="hero">
+    <div><h1>Find your perfect cake.</h1><p>Browse our cakes by category, choose your favourite, and contact your preferred outlet directly on WhatsApp.</p></div>
+    <div class="hero-card"><span>Freshly made • Penang</span></div>
+  </section>
+  <h2 class="section-title">Our Cakes</h2>
+  <div id="categories" class="cats"></div>
+  <div id="cakeGrid" class="grid"></div>
+</main>
+<footer><div class="wrap">Butter Olive Pastry House • Online Cake Catalogue</div></footer>
+
+<div id="cakeModal" class="modal" onclick="modalBackdrop(event)"><div class="modal-card"><button class="close" onclick="closeModal()">×</button><div id="cakeDetail"></div></div></div>
+
+<section id="admin" class="admin">
+  <div class="admin-head"><strong>Catalogue Manager</strong><button class="admin-btn" onclick="closeAdmin()">Back to Website</button></div>
+  <div class="admin-wrap">
+    <div class="panel"><h3>Brand style</h3><div class="form-grid">
+      <label>Title font<select id="titleFont"><option value="'Playfair Display',serif">Playfair Display</option><option value="Georgia,serif">Georgia</option><option value="Arial,sans-serif">Arial</option></select></label>
+      <label>Body font<select id="bodyFont"><option value="'DM Sans',sans-serif">DM Sans</option><option value="Arial,sans-serif">Arial</option><option value="Verdana,sans-serif">Verdana</option></select></label>
+    </div><br><button class="btn" onclick="saveStyle()">Save font settings</button></div>
+
+    <div class="panel"><h3>Outlet WhatsApp</h3><div class="form-grid">
+      <label>Perak Road<input id="wa1" placeholder="6012xxxxxxx"></label>
+      <label>Bayan Lepas<input id="wa2" placeholder="6012xxxxxxx"></label>
+      <label>Moulmein Rise<input id="wa3" placeholder="6012xxxxxxx"></label>
+    </div><br><button class="btn" onclick="saveOutlets()">Save WhatsApp numbers</button></div>
+
+    <div class="panel"><h3>Add cake</h3><div class="form-grid">
+      <label>Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
+      <label>Category<input id="cakeCategory" placeholder="e.g. Fruit Cake"></label>
+      <label>Cake code<input id="cakeCode" placeholder="e.g. FC018"></label>
+      <label>Price<input id="cakePrice" placeholder="e.g. RM88"></label>
+      <label>Size<input id="cakeSize" placeholder="e.g. 6 inch"></label>
+      <label>Photo<input id="cakePhoto" type="file" accept="image/*"></label>
+    </div><br><label>Description<textarea id="cakeDesc" placeholder="Short description"></textarea></label><br><button class="btn" onclick="addCake()">Add to catalogue</button></div>
+
+    <div class="panel"><h3>Current cakes</h3><div id="adminList" class="admin-list"></div></div>
+  </div>
+</section>
+
+<script>
+const defaultData={
+  categories:['All','Signature Cake','Fruit Cake','3D Cake'],
+  outlets:[
+    {name:'Perak Road',number:''},{name:'Bayan Lepas',number:''},{name:'Moulmein Rise',number:''}
+  ],
+  cakes:[
+    {id:1,name:'Signature Chocolate',category:'Signature Cake',code:'SG001',price:'RM88',size:'6 inch',desc:'Rich chocolate cake with a smooth, elegant finish.',image:''},
+    {id:2,name:'Mango Fruit Cake',category:'Fruit Cake',code:'FR001',price:'RM98',size:'6 inch',desc:'Light cream cake topped with fresh mango.',image:''},
+    {id:3,name:'Strawberry Garden',category:'Fruit Cake',code:'FR002',price:'RM108',size:'6 inch',desc:'Fresh strawberry cake with soft sponge and cream.',image:''},
+    {id:4,name:'3D Bear Cake',category:'3D Cake',code:'3D001',price:'From RM168',size:'Custom',desc:'Cute 3D character cake, suitable for birthdays and celebrations.',image:''},
+    {id:5,name:'Classic Tiramisu',category:'Signature Cake',code:'SG002',price:'RM98',size:'6 inch',desc:'Coffee, cocoa and mascarpone-inspired signature cake.',image:''},
+    {id:6,name:'3D Racing Cake',category:'3D Cake',code:'3D002',price:'From RM188',size:'Custom',desc:'Custom 3D themed cake. Design details can be discussed via WhatsApp.',image:''}
+  ]
+};
+let data=JSON.parse(localStorage.getItem('cakeCatalogueData')||'null')||defaultData;
+let activeCategory='All';
+function save(){localStorage.setItem('cakeCatalogueData',JSON.stringify(data));render();}
+function render(){
+  const cats=['All',...new Set(data.cakes.map(c=>c.category).filter(Boolean))];
+  document.getElementById('categories').innerHTML=cats.map(c=>`<button class="cat ${c===activeCategory?'active':''}" onclick="setCat('${esc(c)}')">${c}</button>`).join('');
+  const cakes=activeCategory==='All'?data.cakes:data.cakes.filter(c=>c.category===activeCategory);
+  document.getElementById('cakeGrid').innerHTML=cakes.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image?`<img src="${c.image}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name)}</h3><div class="cake-meta"><span>${esc(c.code)}</span><strong>${esc(c.price)}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('');
+  renderAdmin();
+}
+function esc(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+function setCat(c){activeCategory=c;render()}
+function showCake(id){const c=data.cakes.find(x=>x.id===id);if(!c)return;document.getElementById('cakeDetail').innerHTML=`<div class="detail"><div class="photo">${c.image?`<img src="${c.image}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div><span class="tag">${esc(c.category)}</span><h2>${esc(c.name)}</h2><div class="muted">Cake Code: ${esc(c.code)} • ${esc(c.size)}</div><div class="price">${esc(c.price)}</div><p class="muted">${esc(c.desc)}</p><div class="outlets">${data.outlets.map(o=>`<a class="wa" href="${waLink(o,c)}" target="_blank"><span>WhatsApp ${esc(o.name)}</span><span>›</span></a>`).join('')}</div></div></div>`;document.getElementById('cakeModal').classList.add('show')}
+function waLink(o,c){const msg=`Hi, I would like to enquire about ${c.name}. Cake Code: ${c.code}. Size: ${c.size}.`;return o.number?`https://wa.me/${o.number.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`:'#'}
+function closeModal(){document.getElementById('cakeModal').classList.remove('show')}
+function modalBackdrop(e){if(e.target.id==='cakeModal')closeModal()}
+function openAdmin(){document.getElementById('admin').classList.add('show');loadSettings()}
+function closeAdmin(){document.getElementById('admin').classList.remove('show')}
+function loadSettings(){document.getElementById('wa1').value=data.outlets[0]?.number||'';document.getElementById('wa2').value=data.outlets[1]?.number||'';document.getElementById('wa3').value=data.outlets[2]?.number||'';}
+function saveOutlets(){data.outlets=[{name:'Perak Road',number:wa1.value.trim()},{name:'Bayan Lepas',number:wa2.value.trim()},{name:'Moulmein Rise',number:wa3.value.trim()}];save();alert('WhatsApp numbers saved')}
+function saveStyle(){document.documentElement.style.setProperty('--title-font',titleFont.value);document.documentElement.style.setProperty('--body-font',bodyFont.value);localStorage.setItem('cakeTitleFont',titleFont.value);localStorage.setItem('cakeBodyFont',bodyFont.value);alert('Font settings saved')}
+function applySavedStyle(){const t=localStorage.getItem('cakeTitleFont'),b=localStorage.getItem('cakeBodyFont');if(t)document.documentElement.style.setProperty('--title-font',t);if(b)document.documentElement.style.setProperty('--body-font',b)}
+function addCake(){const f=document.getElementById('cakePhoto').files[0];const done=(img='')=>{const c={id:Date.now(),name:cakeName.value.trim(),category:cakeCategory.value.trim()||'Other',code:cakeCode.value.trim(),price:cakePrice.value.trim(),size:cakeSize.value.trim(),desc:cakeDesc.value.trim(),image:img};if(!c.name)return alert('Please enter cake name');data.cakes.unshift(c);save();['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');alert('Cake added')};if(f){const r=new FileReader();r.onload=e=>done(e.target.result);r.readAsDataURL(f)}else done()}
+function renderAdmin(){const el=document.getElementById('adminList');if(!el)return;el.innerHTML=data.cakes.map(c=>`<div class="admin-item"><div class="admin-thumb">${c.image?`<img src="${c.image}">`:''}</div><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.category)} • ${esc(c.code)} • ${esc(c.price)}</div></div><button class="btn secondary" onclick="deleteCake(${c.id})">Delete</button></div>`).join('')}
+function deleteCake(id){if(confirm('Delete this cake?')){data.cakes=data.cakes.filter(c=>c.id!==id);save()}}
+applySavedStyle();render();
+</script>
+</body>
+</html>
