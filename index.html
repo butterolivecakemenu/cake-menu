@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Butter Olive Cake Catalogue V10 -->
+<!-- Butter Olive Cake Catalogue V11 - automatic WebP image optimisation -->
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
@@ -86,7 +86,7 @@
     footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px}
     @media(max-width:800px){.hero{grid-template-columns:1fr}.hero-card{height:260px}.grid{grid-template-columns:repeat(2,1fr)}.detail{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
     @media(max-width:520px){.grid{grid-template-columns:1fr}.topbar{min-height:98px;height:auto;padding:10px 0}.brand img{width:185px;max-width:56vw;max-height:82px}.hero{padding-top:26px}.hero p{font-size:16px}.hero-card{height:250px}.hero-kicker{font-size:20px}.section-title{font-size:28px}.admin-btn{padding:9px 12px;font-size:13px}}
-  
+
     /* V8 header: no logo */
     .topbar{min-height:74px;height:auto;display:flex;align-items:center;justify-content:flex-end;gap:18px}
     .brand{display:none!important}
@@ -162,6 +162,36 @@
 const SUPABASE_URL='https://xgwhzmlqrhpxefpwzjjw.supabase.co';
 const SUPABASE_KEY='sb_publishable_w-KdyIev9yDLhVunzCpfRg_e-r0qO10';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+// V11 image optimisation: preserve aspect ratio, never upscale,
+// max dimension 1600px, WebP quality 82%.
+async function convertToWebP(file,maxDimension=1600,quality=0.82){
+ if(!file||!String(file.type||'').startsWith('image/'))throw new Error('Please choose a valid image file.');
+ const bitmap=await createImageBitmap(file);
+ let width=bitmap.width,height=bitmap.height;
+ if(width>maxDimension||height>maxDimension){
+  const scale=Math.min(maxDimension/width,maxDimension/height);
+  width=Math.round(width*scale);height=Math.round(height*scale);
+ }
+ const canvas=document.createElement('canvas');
+ canvas.width=width;canvas.height=height;
+ const ctx=canvas.getContext('2d');
+ if(!ctx){if(bitmap.close)bitmap.close();throw new Error('Your browser cannot process this image.');}
+ ctx.drawImage(bitmap,0,0,width,height);
+ if(bitmap.close)bitmap.close();
+ const blob=await new Promise((resolve,reject)=>{
+  canvas.toBlob(result=>result?resolve(result):reject(new Error('Image conversion failed.')),'image/webp',quality);
+ });
+ return blob;
+}
+async function uploadOptimizedImage(file,folder='cakes'){
+ const blob=await convertToWebP(file,1600,0.82);
+ const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2);
+ const path=`${folder}/${Date.now()}-${unique}.webp`;
+ const {error}=await sb.storage.from('cake-images').upload(path,blob,{contentType:'image/webp',cacheControl:'31536000',upsert:false});
+ if(error)throw error;
+ return sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl;
+}
 let cakes=[],categories=[],outlets=[],activeCategory='All',session=null;
 function esc(s=''){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 async function loadData(){
@@ -218,11 +248,16 @@ async function saveHeroBanner(){
  if(!session)return alert('Please login first');
  const f=document.getElementById('heroUpload').files[0];
  if(!f)return alert('Please choose a photo');
- const {error}=await sb.storage.from('cake-images').upload('homepage/hero',f,{upsert:true,contentType:f.type||'image/jpeg'});
- if(error)return alert('Banner upload failed: '+error.message);
- document.getElementById('heroUpload').value='';
- updateHero();
- alert('Homepage banner updated');
+ try{
+  const blob=await convertToWebP(f,1600,0.82);
+  const {error}=await sb.storage.from('cake-images').upload('homepage/hero',blob,{upsert:true,contentType:'image/webp',cacheControl:'3600'});
+  if(error)throw error;
+  document.getElementById('heroUpload').value='';
+  updateHero();
+  alert('Homepage banner updated (WebP optimized)');
+ }catch(error){
+  alert('Banner upload failed: '+error.message);
+ }
 }
 async function resetHeroBanner(){
  if(!session)return alert('Please login first');
@@ -253,7 +288,7 @@ async function deleteCategory(id){
  if(used.length){const sample=used.slice(0,3).map(x=>x.name).join(', ');return alert(`Cannot delete ${c.name} because ${used.length} cake${used.length===1?' is':'s are'} using it${sample?': '+sample:''}. Move those cakes to another category first.`)}
  if(!confirm(`Delete category \"${c.name}\"?`))return;const {error}=await sb.from('categories').delete().eq('id',id);if(error)return alert(error.message);if(activeCategory===c.name)activeCategory='All';await loadData();alert('Category deleted')
 }
-async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
+async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
  const category_id=Number(cakeCategory.value);if(!category_id)return alert('Please select a category');
  const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:category_id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
 function renderAdmin(){
@@ -266,7 +301,7 @@ function renderAdmin(){
 function fillEditCategories(selectedId){editCategory.innerHTML=categories.map(c=>`<option value="${c.id}" ${String(c.id)===String(selectedId)?'selected':''}>${esc(c.name)}</option>`).join('')}
 function editCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;editCakeId.value=c.id;editName.value=c.name||'';fillEditCategories(c.category_id);editCode.value=c.cake_code||'';editPrice.value=c.price??'';editSize.value=c.size||'';editSort.value=c.sort_order??0;editActive.value=String(c.active!==false);editDesc.value=c.description||'';editPhoto.value='';editPanel.classList.add('show');editPanel.scrollIntoView({behavior:'smooth',block:'start'})}
 function cancelCakeEdit(){editPanel.classList.remove('show');editCakeId.value=''}
-async function saveCakeEdit(){const id=Number(editCakeId.value);if(!id)return;const c=cakes.find(x=>x.id===id);if(!c)return;const name=editName.value.trim();if(!name)return alert('Please enter cake name');let image_url=c.image_url||null;const f=editPhoto.files[0];if(f){const safe=(f.name||'cake.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${Date.now()}-${safe}`;const {error}=await sb.storage.from('cake-images').upload(path,f);if(error)return alert('Photo upload failed: '+error.message);image_url=sb.storage.from('cake-images').getPublicUrl(path).data.publicUrl}
+async function saveCakeEdit(){const id=Number(editCakeId.value);if(!id)return;const c=cakes.find(x=>x.id===id);if(!c)return;const name=editName.value.trim();if(!name)return alert('Please enter cake name');let image_url=c.image_url||null;const f=editPhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
  const raw=String(editPrice.value).replace(/[^0-9.]/g,'');const payload={name,category_id:Number(editCategory.value),cake_code:editCode.value.trim(),price:raw?Number(raw):null,size:editSize.value.trim(),description:editDesc.value.trim(),image_url,sort_order:Number(editSort.value||0),active:editActive.value==='true'};const {error}=await sb.from('cakes').update(payload).eq('id',id);if(error)return alert(error.message);cancelCakeEdit();await loadData();alert('Cake updated')}
 async function moveCake(id,direction){
  if(!session)return alert('Please login first');
