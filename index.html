@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Butter Olive Cake Catalogue V11 - automatic WebP image optimisation -->
+<!-- Butter Olive Cake Catalogue V12 - flexible cake types + category ordering -->
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#f5f5f3;--card:#fff;--ink:#333333;--muted:#666666;--accent:#555555;--accent2:#c8a97e;--line:#e8dfd4;
+      --bg:#f8f5ef;--card:#fff;--ink:#2d241e;--muted:#7d7066;--accent:#8a623f;--accent2:#c8a97e;--line:#e8dfd4;
       --title-font:'Playfair Display',serif;--body-font:'DM Sans',sans-serif;
     }
     *{box-sizing:border-box}
@@ -80,7 +80,7 @@
     .admin-item{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px}
     .admin-thumb{width:70px;height:55px;border-radius:10px;background:#ead8c2;overflow:hidden}.admin-thumb img{width:100%;height:100%;object-fit:cover}
     .category-admin-list{display:grid;gap:10px;margin-top:14px}
-    .category-admin-item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .category-admin-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff}.category-admin-item.dragging{opacity:.45}.drag-handle{font-size:22px;cursor:grab;user-select:none;color:var(--muted);padding:4px 6px}.type-switch{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}.type-switch button{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:999px;cursor:pointer;font-weight:600}.type-switch button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
     .category-admin-item strong{font-size:15px}
     .muted{color:var(--muted)}
     footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px}
@@ -131,14 +131,17 @@
 
     <div class="panel"><h3>Categories</h3><p class="muted">Add, rename or delete catalogue categories. Duplicate category names are blocked.</p><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button><div id="categoryAdminList" class="category-admin-list"></div></div>
 
-    <div class="panel"><h3>Add cake</h3><div class="form-grid">
-      <label>Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
+    <div class="panel"><h3>Add cake</h3>
+      <div class="type-switch"><button id="standardTypeBtn" class="active" type="button" onclick="setCakeType('standard')">Standard Cake</button><button id="multiTypeBtn" type="button" onclick="setCakeType('multi')">Multi-Flavour / Design Cake</button></div>
+      <input id="cakeType" type="hidden" value="standard">
+      <div class="form-grid">
+      <label id="cakeNameLabel">Cake name<input id="cakeName" placeholder="e.g. Mango Shortcake"></label>
       <label>Category<select id="cakeCategory"></select></label>
       <label>Cake code<input id="cakeCode" placeholder="e.g. FC018"></label>
       <label>Price<input id="cakePrice" placeholder="e.g. RM88"></label>
       <label>Size<input id="cakeSize" placeholder="e.g. 6 inch"></label>
       <label>Photo<input id="cakePhoto" type="file" accept="image/*"></label>
-    </div><br><label>Description<textarea id="cakeDesc" placeholder="Short description"></textarea></label><br><button class="btn" onclick="addCake()">Add to catalogue</button></div>
+    </div><br><label id="flavourLabel" style="display:none">Flavour options / combinations<textarea id="cakeFlavours" placeholder="e.g. Vanilla + Blueberry&#10;Chocolate + Chocolate&#10;Pandan + Kaya"></textarea></label><br id="flavourBreak" style="display:none"><label>Description<textarea id="cakeDesc" placeholder="Short description (optional)"></textarea></label><br><button class="btn" onclick="addCake()">Add to catalogue</button></div>
 
     <div id="editPanel" class="panel edit-panel"><h3>Edit cake</h3><input id="editCakeId" type="hidden"><div class="form-grid">
       <label>Cake name<input id="editName"></label>
@@ -275,7 +278,19 @@ async function addCategory(){
 }
 function renderCategoryAdmin(){
  const el=document.getElementById('categoryAdminList');if(!el||!session)return;
- el.innerHTML=categories.map(c=>{const count=cakes.filter(x=>Number(x.category_id)===Number(c.id)).length;return `<div class=\"category-admin-item\"><div><strong>${esc(c.name)}</strong><div class=\"muted\">${count} cake${count===1?'':'s'}</div></div><div class=\"actions\"><button class=\"btn secondary\" onclick=\"renameCategory(${c.id})\">Rename</button><button class=\"btn secondary\" onclick=\"deleteCategory(${c.id})\">Delete</button></div></div>`}).join('')
+ const ordered=[...categories].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
+ el.innerHTML=ordered.map((c,i)=>{const count=cakes.filter(x=>Number(x.category_id)===Number(c.id)).length;return `<div class="category-admin-item" draggable="true" data-category-id="${c.id}"><div class="drag-handle" title="Drag to reorder">☰</div><div><strong>${esc(c.name)}</strong><div class="muted">${count} cake${count===1?'':'s'} • Position ${i+1}</div></div><div class="actions"><button class="btn secondary" onclick="moveCategory(${c.id},-1)" ${i===0?'disabled':''}>↑</button><button class="btn secondary" onclick="moveCategory(${c.id},1)" ${i===ordered.length-1?'disabled':''}>↓</button><button class="btn secondary" onclick="renameCategory(${c.id})">Rename</button><button class="btn secondary" onclick="deleteCategory(${c.id})">Delete</button></div></div>`}).join('');
+ enableCategoryDrag();
+}
+async function saveCategoryOrder(ids){
+ const results=await Promise.all(ids.map((id,i)=>sb.from('categories').update({sort_order:i+1}).eq('id',id)));
+ const failed=results.find(r=>r.error);if(failed)return alert(failed.error.message);await loadData();
+}
+async function moveCategory(id,direction){
+ const ordered=[...categories].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);const from=ordered.findIndex(c=>Number(c.id)===Number(id));const to=from+direction;if(from<0||to<0||to>=ordered.length)return;[ordered[from],ordered[to]]=[ordered[to],ordered[from]];await saveCategoryOrder(ordered.map(c=>c.id));
+}
+function enableCategoryDrag(){
+ const el=document.getElementById('categoryAdminList');let dragged=null;el.querySelectorAll('.category-admin-item').forEach(item=>{item.addEventListener('dragstart',()=>{dragged=item;item.classList.add('dragging')});item.addEventListener('dragend',()=>{item.classList.remove('dragging');dragged=null});item.addEventListener('dragover',e=>{e.preventDefault();if(!dragged||dragged===item)return;const r=item.getBoundingClientRect();el.insertBefore(dragged,e.clientY<r.top+r.height/2?item:item.nextSibling)});});el.addEventListener('drop',async e=>{e.preventDefault();const ids=[...el.querySelectorAll('.category-admin-item')].map(x=>Number(x.dataset.categoryId));await saveCategoryOrder(ids)});
 }
 async function renameCategory(id){
  const c=categories.find(x=>Number(x.id)===Number(id));if(!c)return;
@@ -288,9 +303,10 @@ async function deleteCategory(id){
  if(used.length){const sample=used.slice(0,3).map(x=>x.name).join(', ');return alert(`Cannot delete ${c.name} because ${used.length} cake${used.length===1?' is':'s are'} using it${sample?': '+sample:''}. Move those cakes to another category first.`)}
  if(!confirm(`Delete category \"${c.name}\"?`))return;const {error}=await sb.from('categories').delete().eq('id',id);if(error)return alert(error.message);if(activeCategory===c.name)activeCategory='All';await loadData();alert('Category deleted')
 }
-async function addCake(){const name=cakeName.value.trim();if(!name)return alert('Please enter cake name');let image_url=null;const f=cakePhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
+function setCakeType(type){cakeType.value=type;standardTypeBtn.classList.toggle('active',type==='standard');multiTypeBtn.classList.toggle('active',type==='multi');cakeNameLabel.firstChild.textContent=type==='multi'?'Cake name (optional)':'Cake name';cakeName.placeholder=type==='multi'?'Optional — cake code can be used instead':'e.g. Mango Shortcake';flavourLabel.style.display=type==='multi'?'block':'none';flavourBreak.style.display=type==='multi'?'block':'none'}
+async function addCake(){const type=cakeType.value;let name=cakeName.value.trim();const code=cakeCode.value.trim();if(type==='standard'&&!name)return alert('Please enter cake name');if(type==='multi'&&!name&&!code)return alert('Please enter at least a cake code');if(!name)name=code;let image_url=null;const f=cakePhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
  const category_id=Number(cakeCategory.value);if(!category_id)return alert('Please select a category');
- const raw=cakePrice.value.replace(/[^0-9.]/g,'');const payload={name,category_id:category_id,cake_code:cakeCode.value.trim(),price:raw?Number(raw):null,size:cakeSize.value.trim(),description:cakeDesc.value.trim(),image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCategory','cakeCode','cakePrice','cakeSize','cakeDesc','cakePhoto'].forEach(id=>document.getElementById(id).value='');await loadData();alert('Cake added')}
+ const raw=cakePrice.value.replace(/[^0-9.]/g,'');let description=cakeDesc.value.trim();const flavours=cakeFlavours.value.trim();if(type==='multi'&&flavours)description=`Flavour Options:\n${flavours}${description?'\n\n'+description:''}`;const payload={name,category_id:category_id,cake_code:code,price:raw?Number(raw):null,size:cakeSize.value.trim(),description,image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCode','cakePrice','cakeSize','cakeDesc','cakeFlavours','cakePhoto'].forEach(id=>document.getElementById(id).value='');setCakeType('standard');await loadData();alert('Cake added')}
 function renderAdmin(){
  const el=document.getElementById('adminList');if(!el||!session)return;
  const ordered=[...cakes].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
