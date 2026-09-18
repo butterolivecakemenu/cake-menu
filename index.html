@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Butter Olive Cake Catalogue V12.2 - cleaner flavour detail + editable flavour options -->
+<!-- Butter Olive Cake Catalogue V12.3 - cleaner flavour detail + editable flavour options -->
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
@@ -246,13 +246,28 @@ function render(){
  updateHero();
  renderAdmin();
 }
+const CAKE_DESC_MARKER='[[BUTTER_OLIVE_DESCRIPTION]]';
 function splitCakeText(description=''){
  const text=String(description||'').trim();
  if(!text)return {flavours:'',description:''};
  if(!/^Flavour Options:\s*/i.test(text))return {flavours:'',description:text};
  const body=text.replace(/^Flavour Options:\s*/i,'');
- const parts=body.split(/\n\s*\n/);
- return {flavours:(parts.shift()||'').trim(),description:parts.join('\n\n').trim()};
+ const markerPos=body.indexOf(CAKE_DESC_MARKER);
+ if(markerPos>=0){
+  return {
+   flavours:body.slice(0,markerPos).trim(),
+   description:body.slice(markerPos+CAKE_DESC_MARKER.length).trim()
+  };
+ }
+ // Legacy V12.2 data: keep the whole old block as Flavour Options.
+ // This avoids treating blank lines inside a long flavour list as Description.
+ return {flavours:body.trim(),description:''};
+}
+function buildCakeText(flavours='',description=''){
+ const f=String(flavours||'').trim();
+ const d=String(description||'').trim();
+ if(!f)return d;
+ return `Flavour Options:\n${f}${d?`\n\n${CAKE_DESC_MARKER}\n${d}`:''}`;
 }
 function showCake(id){
  const c=cakes.find(x=>x.id===id);if(!c)return;
@@ -330,7 +345,7 @@ async function deleteCategory(id){
 function setCakeType(type){cakeType.value=type;standardTypeBtn.classList.toggle('active',type==='standard');multiTypeBtn.classList.toggle('active',type==='multi');cakeNameLabel.firstChild.textContent=type==='multi'?'Cake name (optional)':'Cake name';cakeName.placeholder=type==='multi'?'Optional — cake code can be used instead':'e.g. Mango Shortcake';flavourLabel.style.display=type==='multi'?'block':'none';flavourBreak.style.display=type==='multi'?'block':'none'}
 async function addCake(){const type=cakeType.value;let name=cakeName.value.trim();const code=cakeCode.value.trim();if(type==='standard'&&!name)return alert('Please enter cake name');if(type==='multi'&&!name&&!code)return alert('Please enter at least a cake code');if(!name)name=code;let image_url=null;const f=cakePhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
  const category_id=Number(cakeCategory.value);if(!category_id)return alert('Please select a category');
- const raw=cakePrice.value.replace(/[^0-9.]/g,'');let description=cakeDesc.value.trim();const flavours=cakeFlavours.value.trim();if(type==='multi'&&flavours)description=`Flavour Options:\n${flavours}${description?'\n\n'+description:''}`;const payload={name,category_id:category_id,cake_code:code,price:raw?Number(raw):null,size:cakeSize.value.trim(),description,image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCode','cakePrice','cakeSize','cakeDesc','cakeFlavours','cakePhoto'].forEach(id=>document.getElementById(id).value='');setCakeType('standard');await loadData();alert('Cake added')}
+ const raw=cakePrice.value.replace(/[^0-9.]/g,'');const flavours=type==='multi'?cakeFlavours.value.trim():'';const description=buildCakeText(flavours,cakeDesc.value);const payload={name,category_id:category_id,cake_code:code,price:raw?Number(raw):null,size:cakeSize.value.trim(),description,image_url,sort_order:cakes.length+1,active:true};const {error}=await sb.from('cakes').insert(payload);if(error)return alert(error.message);['cakeName','cakeCode','cakePrice','cakeSize','cakeDesc','cakeFlavours','cakePhoto'].forEach(id=>document.getElementById(id).value='');setCakeType('standard');await loadData();alert('Cake added')}
 function renderAdmin(){
  const el=document.getElementById('adminList');if(!el||!session)return;
  const ordered=[...cakes].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
@@ -342,7 +357,7 @@ function fillEditCategories(selectedId){editCategory.innerHTML=categories.map(c=
 function editCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;const parts=splitCakeText(c.description||'');editCakeId.value=c.id;editName.value=c.name||'';fillEditCategories(c.category_id);editCode.value=c.cake_code||'';editPrice.value=c.price??'';editSize.value=c.size||'';editSort.value=c.sort_order??0;editActive.value=String(c.active!==false);editFlavours.value=parts.flavours;editDesc.value=parts.description;editPhoto.value='';editPanel.classList.add('show');editPanel.scrollIntoView({behavior:'smooth',block:'start'})}
 function cancelCakeEdit(){editPanel.classList.remove('show');editCakeId.value=''}
 async function saveCakeEdit(){const id=Number(editCakeId.value);if(!id)return;const c=cakes.find(x=>x.id===id);if(!c)return;const name=editName.value.trim();if(!name)return alert('Please enter cake name');let image_url=c.image_url||null;const f=editPhoto.files[0];if(f){try{image_url=await uploadOptimizedImage(f,'cakes')}catch(error){return alert('Photo upload failed: '+error.message)}}
- const raw=String(editPrice.value).replace(/[^0-9.]/g,'');const flavours=editFlavours.value.trim();const desc=editDesc.value.trim();const description=flavours?`Flavour Options:\n${flavours}${desc?'\n\n'+desc:''}`:desc;const payload={name,category_id:Number(editCategory.value),cake_code:editCode.value.trim(),price:raw?Number(raw):null,size:editSize.value.trim(),description,image_url,sort_order:Number(editSort.value||0),active:editActive.value==='true'};const {error}=await sb.from('cakes').update(payload).eq('id',id);if(error)return alert(error.message);cancelCakeEdit();await loadData();alert('Cake updated')}
+ const raw=String(editPrice.value).replace(/[^0-9.]/g,'');const description=buildCakeText(editFlavours.value,editDesc.value);const payload={name,category_id:Number(editCategory.value),cake_code:editCode.value.trim(),price:raw?Number(raw):null,size:editSize.value.trim(),description,image_url,sort_order:Number(editSort.value||0),active:editActive.value==='true'};const {error}=await sb.from('cakes').update(payload).eq('id',id);if(error)return alert(error.message);cancelCakeEdit();await loadData();alert('Cake updated')}
 async function moveCake(id,direction){
  if(!session)return alert('Please login first');
  const ordered=[...cakes].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
