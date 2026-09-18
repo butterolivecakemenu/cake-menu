@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Butter Olive Cake Catalogue V12 - flexible cake types + category ordering -->
+<!-- Butter Olive Cake Catalogue V12.1 - visible cake type selector + category custom ordering -->
 <html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
@@ -129,9 +129,9 @@
       <label>Moulmein Rise<input id="wa3" placeholder="6012xxxxxxx"></label>
     </div><br><button class="btn" onclick="saveOutlets()">Save WhatsApp numbers</button></div>
 
-    <div class="panel"><h3>Categories</h3><p class="muted">Add, rename or delete catalogue categories. Duplicate category names are blocked.</p><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button><div id="categoryAdminList" class="category-admin-list"></div></div>
+    <div class="panel"><h3>Categories</h3><p class="muted"><strong>Custom order enabled:</strong> use ↑ / ↓ to arrange categories freely. The customer website follows this order.</p><div class="form-grid"><label>New category<input id="newCategory" placeholder="e.g. Kids Cake"></label></div><br><button class="btn" onclick="addCategory()">Add category</button><div id="categoryAdminList" class="category-admin-list"></div></div>
 
-    <div class="panel"><h3>Add cake</h3>
+    <div class="panel"><h3>Add cake</h3><p class="muted"><strong>Choose cake format:</strong> Standard Cake has a name; Multi-Flavour / Design Cake may use only a cake code and multiple flavour combinations.</p>
       <div class="type-switch"><button id="standardTypeBtn" class="active" type="button" onclick="setCakeType('standard')">Standard Cake</button><button id="multiTypeBtn" type="button" onclick="setCakeType('multi')">Multi-Flavour / Design Cake</button></div>
       <input id="cakeType" type="hidden" value="standard">
       <div class="form-grid">
@@ -231,12 +231,12 @@ function render(){
  document.getElementById('categories').innerHTML=cats.map(c=>`<button class="cat ${c===activeCategory?'active':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
  document.querySelectorAll('.cat').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.cat;render()});
  const visible=cakes.filter(c=>c.active!==false); const shown=activeCategory==='All'?visible:visible.filter(c=>c.category===activeCategory);
- document.getElementById('cakeGrid').innerHTML=shown.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image_url?`<img src="${esc(c.image_url)}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name)}</h3><div class="cake-meta"><span>${esc(c.cake_code||'')}</span><strong>${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('') || '<p class="muted">No cakes in this category yet.</p>';
+ document.getElementById('cakeGrid').innerHTML=shown.map(c=>`<article class="cake" onclick="showCake(${c.id})"><div class="cake-img">${c.image_url?`<img src="${esc(c.image_url)}" alt="${esc(c.name)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div class="cake-body"><h3 class="cake-name">${esc(c.name||c.cake_code||'Cake')}</h3><div class="cake-meta"><span>${esc(c.cake_code||'')}</span><strong>${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</strong></div><span class="tag">${esc(c.category)}</span></div></article>`).join('') || '<p class="muted">No cakes in this category yet.</p>';
  updateHero();
  renderAdmin();
 }
-function showCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;document.getElementById('cakeDetail').innerHTML=`<div class="detail"><div class="photo">${c.image_url?`<img src="${esc(c.image_url)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div><span class="tag">${esc(c.category)}</span><h2>${esc(c.name)}</h2><div class="muted">Cake Code: ${esc(c.cake_code||'')} • ${esc(c.size||'')}</div><div class="price">${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</div><p class="muted">${esc(c.description||'')}</p><div class="outlets">${outlets.map(o=>`<a class="wa" href="${waLink(o,c)}" target="_blank"><span>WhatsApp ${esc(o.name)}</span><span>›</span></a>`).join('')}</div></div></div>`;cakeModal.classList.add('show')}
-function waLink(o,c){const msg=`Hi, I would like to enquire about ${c.name}. Cake Code: ${c.cake_code||''}. Size: ${c.size||''}.`;return o.whatsapp?`https://wa.me/${o.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`:'#'}
+function showCake(id){const c=cakes.find(x=>x.id===id);if(!c)return;document.getElementById('cakeDetail').innerHTML=`<div class="detail"><div class="photo">${c.image_url?`<img src="${esc(c.image_url)}">`:`<div class="placeholder">${esc(c.category)}</div>`}</div><div><span class="tag">${esc(c.category)}</span><h2>${esc(c.name||c.cake_code||'Cake')}</h2><div class="muted">Cake Code: ${esc(c.cake_code||'')} • ${esc(c.size||'')}</div><div class="price">${c.price!=null?'RM'+Number(c.price).toFixed(2):''}</div><p class="muted">${esc(c.description||'')}</p><div class="outlets">${outlets.map(o=>`<a class="wa" href="${waLink(o,c)}" target="_blank"><span>WhatsApp ${esc(o.name)}</span><span>›</span></a>`).join('')}</div></div></div>`;cakeModal.classList.add('show')}
+function waLink(o,c){const msg=`Hi, I would like to enquire about ${c.name||c.cake_code||'this cake'}. Cake Code: ${c.cake_code||''}. Size: ${c.size||''}.`;return o.whatsapp?`https://wa.me/${o.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`:'#'}
 function closeModal(){cakeModal.classList.remove('show')} function modalBackdrop(e){if(e.target.id==='cakeModal')closeModal()}
 async function openAdmin(){document.getElementById('admin').classList.add('show');const {data}=await sb.auth.getSession();session=data.session;updateAdminUI()}
 function closeAdmin(){document.getElementById('admin').classList.remove('show')}
@@ -279,7 +279,7 @@ async function addCategory(){
 function renderCategoryAdmin(){
  const el=document.getElementById('categoryAdminList');if(!el||!session)return;
  const ordered=[...categories].sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||a.id-b.id);
- el.innerHTML=ordered.map((c,i)=>{const count=cakes.filter(x=>Number(x.category_id)===Number(c.id)).length;return `<div class="category-admin-item" draggable="true" data-category-id="${c.id}"><div class="drag-handle" title="Drag to reorder">☰</div><div><strong>${esc(c.name)}</strong><div class="muted">${count} cake${count===1?'':'s'} • Position ${i+1}</div></div><div class="actions"><button class="btn secondary" onclick="moveCategory(${c.id},-1)" ${i===0?'disabled':''}>↑</button><button class="btn secondary" onclick="moveCategory(${c.id},1)" ${i===ordered.length-1?'disabled':''}>↓</button><button class="btn secondary" onclick="renameCategory(${c.id})">Rename</button><button class="btn secondary" onclick="deleteCategory(${c.id})">Delete</button></div></div>`}).join('');
+ el.innerHTML=ordered.map((c,i)=>{const count=cakes.filter(x=>Number(x.category_id)===Number(c.id)).length;return `<div class="category-admin-item" draggable="true" data-category-id="${c.id}"><div class="drag-handle" title="Drag to reorder">☰</div><div><strong>${esc(c.name)}</strong><div class="muted">${count} cake${count===1?'':'s'} • Position ${i+1}</div></div><div class="actions"><button class="btn secondary" onclick="moveCategory(${c.id},-1)" ${i===0?'disabled':''}>↑ Up</button><button class="btn secondary" onclick="moveCategory(${c.id},1)" ${i===ordered.length-1?'disabled':''}>↓ Down</button><button class="btn secondary" onclick="renameCategory(${c.id})">Rename</button><button class="btn secondary" onclick="deleteCategory(${c.id})">Delete</button></div></div>`}).join('');
  enableCategoryDrag();
 }
 async function saveCategoryOrder(ids){
